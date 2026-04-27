@@ -1,0 +1,30 @@
+# /etc/aide/aide.conf.d/99_docker_and_netdata_exclusions
+#
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: Estää AIDE:a (Advanced Intrusion Detection Environment) tarkistamasta
+#            korkean frekvenssin dynaamisia hakemistoja. Tämä vähentää vääriä
+#            hälytyksiä (false positives) ja säästää järjestelmän resursseja.
+# Konteksti: ansible-lockdown/UBUNTU24-CIS-roolin (https://github.com/ansible-lockdown/UBUNTU24-CIS) 
+#            -kovennusten jälkeinen hienosäätö Raspberry Pi 5:lla.
+#
+# Verifiointi:
+#   Aja 'sudo aide --check'. Raportissa ei tulisi enää näkyä satoja/tuhansia 
+#   muutettuja tiedostoja Dockerin tai Netdatan polkujen alta.
+#
+# Huom! AIDE-tietokanta tulee päivittää (aide --update & DB-kopiointi) näiden 
+#       sääntöjen lisäämisen jälkeen. 
+
+# 1. Docker & Containerd
+# Konteilla on erittäin dynaamiset overlay-tiedostojärjestelmät ja ajonaikaiset 
+# tilatiedostot, joita AIDE:n ei ole tarkoitus eikä tarpeellista seurata.
+!/var/lib/docker
+!/var/lib/containerd
+!/run/docker
+!/run/containerd
+
+# 2. Netdata
+# Netdata kerää ja tallentaa metriikkaa reaaliajassa. Nämä hakemistot muuttuvat 
+# jatkuvasti, mikä aiheuttaisi jatkuvia vääriä hälytyksiä eheystarkistuksissa.
+!/var/lib/netdata
+!/var/cache/netdata
