@@ -1,0 +1,76 @@
+# Raspberry Pi 5 (Ubuntu Server 24.04 ARM64)
+#
+# Käytetty rooli: ansible-lockdown/UBUNTU24-CIS (v1.5.0)
+# Tarkoitus: Soveltaa CIS Ubuntu 24.04 Level 1 -standardia
+#           ARM-pohjaiseen reunalaskentaympäristöön
+#           Zero Trust -mallin (Tailscale) ja Dockerin kanssa.
+#
+# Poikkeamat on perusteltu laitteisto- (ARM64, NVMe), sovellus-
+# (Docker, containerd) ja verkko- (Tailscale mesh) yhteensopivuussyillä.
+# Riskit on hyväksytty pienen kehitystiimin ja
+# kehitysympäristön luonteen vuoksi.
+#
+# Tekijä: Jesse Karnavaara
+# Päivämäärä: 2026
+
+- name: Ota käyttöön CIS-tason 1 palvelinkovennus ARM-pohjaisessa Raspberry Pi 5:ssä
+  hosts: raspberry_pis
+  become: yes
+  vars:
+
+    ubtu24cis_level_1: true
+    ubtu24cis_level_2: false
+
+    # Korjattu CIS Level 1 -säännön 5.2.7 mukaiseksi
+    # (ei "nosugroup")
+    ubtu24cis_sugroup: sugroup
+
+    # Korjattu CIS Level 1 -säännön 5.1.4 mukaiseksi
+    ubtu24cis_sshd_allow_users: "jkarnavaara llimnell"
+
+    # PERUSTELLUT POIKKEAMAT CIS Level 1 -VAATIMUKSISTA
+
+    # Poikkeama: Raspberry Pi 5 käyttää yhtä NVMe-levyä (litteä osiointi).
+    # Tiukka partitiointi ei ole käytännössä mahdollista eikä tuo
+    # merkittävää lisähyötyä pienessä kehitysympäristössä.
+    # Riski hyväksytään.
+    ubtu24cis_rule_1_1_2_3_1: false # /home
+    ubtu24cis_rule_1_1_2_4_1: false # /var
+    ubtu24cis_rule_1_1_2_5_1: false # /var/tmp
+    ubtu24cis_rule_1_1_2_6_1: false # /var/log
+    ubtu24cis_rule_1_1_2_7_1: false # /var/log/audit
+
+    # Docker- ja containerd-hakemistot jätetään pois unowned-tiedostojen
+    # hausta (CIS Level 1 -sääntö 7.1.12), jotta vältetään vääriä positiivisia ja kuormitusta.
+    ubtu24cis_exclude_unowned_search_path: "\\( ! -path \"/run/user/*\" -a ! -path
+      \"/proc/*\" -a ! -path \"*/containerd/*\" -a ! -path \"*/kubelet/pods/*\"
+      -a ! -path \"*/kubelet/plugins/*\" -a ! -path \"/sys/fs/cgroup/memory/*\"
+      -a ! -path \"/var/*/private/*\" -a ! -path \"/snap/*\" -a ! -path
+      \"/var/lib/docker/*\" -a ! -path \"/var/lib/containerd/*\" \\)"
+
+    # "fat" ja "overlay" -moduulit sallitaan, joita Docker ja Raspberry Pi tarvitsevat.
+    # 17 legacy-tiedostojärjestelmää poistetaan käytöstä erikseen
+    # /etc/modprobe.d/cis_disable_fs.conf-tiedostossa.
+    ubtu24cis_rule_1_1_1_10: false
+
+    # ARM64 vs x86_64 -yhteensopimattomuudet
+    ubtu24cis_rule_1_3_1_2: false # GRUB AppArmor-määritys
+    ubtu24cis_apparmor_mode: "complain"
+      # ^ Tilapäisesti complain-tilassa (ei enforce) ARM64-yhteensopivuuden vuoksi
+      # ^ (ei enforce) ARM64-yhteensopivuuden vuoksi.
+      # ^ Siirretään enforce-tilaan myöhemmin.
+    ubtu24cis_rule_1_4_1: false # GRUB-käynnistyslataajan salasana
+    ubtu24cis_rule_1_4_2: false # GRUB-asetustiedoston oikeudet
+    ubtu24cis_rule_6_2_1_3: false # GRUB pre-auditd
+    ubtu24cis_rule_6_2_1_4: false # GRUB audit_backlog_limit
+
+    # Tailscale Zero Trust -verkon vaatimat poikkeamat
+    ubtu24cis_rule_3_1_2: false # WiFi-korttien (wlan0) poisto estetty
+    ubtu24cis_rule_3_3_1: false # IPv4-edelleenlähetys sallittu (Docker)
+    ubtu24cis_rule_4_2_3: false # UFW manuaalisesti hallittu Tailscalen kanssa
+    ubtu24cis_rule_4_2_5: false # UFW lähtevän liikenteen säännöt
+    ubtu24cis_rule_4_2_6: false # UFW avoimien porttien tarkistus
+    ubtu24cis_rule_4_2_7: false # UFW oletusestokäytäntö (mesh-reititys)
+
+  roles:
+    - UBUNTU24-CIS
