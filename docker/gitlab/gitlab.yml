@@ -1,0 +1,59 @@
+# gitlab.yml
+#
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: GitLab CE -palvelun konfiguraatio, joka sisällytetään varsinaiseen 
+#            docker-compose.yml -tiedostoon 'extends'-ominaisuuden avulla.
+#            Määritetty Codebased Oy:n Raspberry Pi 5 -kehitysinfraan.
+#
+# Huomiot konfiguraatiosta:
+# - Arkkitehtuuri: 'platform: linux/arm64' pakottaa oikean levykuvan Raspberry Pi:lle.
+# - Verkko ja Proxy: GitLabin sisäinen NGINX on konfiguroitu toimimaan ulkoisen 
+#   käänteisen välityspalvelimen (reverse proxy) takana Tailscale-verkossa (*.ts.net).
+# - Identiteetinhallinta: Azure AD (Entra ID) SSO -integraatio OmniAuthin avulla. 
+#   Kriittiset salaisuudet (Client ID, Secret, Tenant) injektoidaan turvallisesti 
+#   ulkoisesta .env -tiedostosta, eivätkä ne päädy versionhallintaan.
+# - Valvonta: Kustomoitu Docker Healthcheck, joka osaa ottaa huomioon GitLabin 
+#   verrattain pitkän käynnistymisajan (start_period: 360s) kevyellä ARM-laitteistolla.
+#
+# HUOM: Tämä versio on muokattu julkista opinnäytetyön repositoriota varten.
+#       Osa Tailscale-verkko-osoitteesta on sensuroitu.
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:18.11.1-ce.0
+    platform: linux/arm64
+    container_name: gitlab
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        nginx['listen_port'] = 80 # required to set for the HTTPS external URL to work correctly when using custom NGINX reverse proxy.
+        nginx['listen_https'] = false # ^ same reason as the above
+        external_url 'https://codebased-edge.[SENSUROITU].ts.net/gitlab/'
+        gitlab_rails['omniauth_enabled'] = true
+        gitlab_rails['omniauth_allow_single_sign_on'] = ['azure_activedirectory_v2']
+        gitlab_rails['omniauth_block_auto_created_users'] = false
+        gitlab_rails['omniauth_auto_link_ldap_user'] = false
+        gitlab_rails['omniauth_providers'] = [
+          {
+            "name" => "azure_activedirectory_v2",
+            "args" => {
+              "client_id" => '${CLIENT_ID}',
+              "client_secret" => '${CLIENT_SECRET}',
+              "tenant_id" => '${TENANT_ID}',
+            }
+          }
+        ]
+    ports:
+      - "443"
+      - "80"
+      - "2222:22"
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    healthcheck:
+      test: curl --fail http://localhost:80/gitlab/-/health || exit 1
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 360s
