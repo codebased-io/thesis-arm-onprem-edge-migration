@@ -1,0 +1,29 @@
+# gitlab-runner.yml
+#
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: GitLab Runner -palvelun Docker-konfiguraatio. Tämä tiedosto 
+#            liitetään osaksi päärakenteen docker-compose.yml -tiedostoa.
+#            Optimoitu Raspberry Pi 5 -ympäristöön.
+#
+# Huomiot konfiguraatiosta:
+# - Arkkitehtuuri: "platform: linux/arm64" varmistaa yhteensopivuuden Pi 5:n 
+#   Broadcom BCM2712 -prosessorin kanssa.
+# - Docker-integraatio: Isäntäkoneen Docker-soketti (/var/run/docker.sock) 
+#   on tuotu konttiin, jotta Runner voi hallita isäntäkoneen Docker-taustaprosessia (daemon) 
+#   ja ajaa CI/CD-vaiheita erillisissä konteissa kyljittäin (Docker-out-of-Docker/DooD).
+# - Pysyvyys: Konfiguraatiotiedostot tallennetaan nimettyyn volyymiin 
+#   (gitlab_runner_config), jotta rekisteröintitiedot säilyvät päivityksissä.
+#
+# Verifiointi:
+#   Varmista kontin tila: docker ps | grep gitlab_runner
+#   Lue lokit: docker logs -f gitlab_runner
+
+services:
+  gitlab_runner:
+    image: gitlab/gitlab-runner:latest
+    platform: linux/arm64
+    container_name: gitlab_runner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab_runner_config:/etc/gitlab-runner
