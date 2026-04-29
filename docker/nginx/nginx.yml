@@ -1,0 +1,44 @@
+# nginx.yml
+#
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: NGINX-käänteisvälityspalvelimen (Reverse Proxy) konfiguraatio, 
+#            joka sisällytetään docker-compose.yml -päärakenteeseen.
+#            Toimii turvallisena portinvartijana kehitysinfran taustapalveluille
+#            ja TLS/SSL:n terminoijana.
+#
+# Huomiot konfiguraatiosta:
+# - Zero Trust ja Verkkoturvallisuus: Portit (80, 443) on sidottu tiukasti vain 
+#   Tailscalen virtuaalisen verkkokortin IP-osoitteeseen, joka on määritelty .env -tiedostossa
+#   ympäristömuuttujana. 
+#   Palvelut eivät ole näkyvissä julkiseen internetiin tai fyysiseen lähiverkkoon.
+# - Sertifikaattien elinkaari on tehty isäntäkoneella (host) käyttämällä crontabia.
+#   Tämä varmistaa automaattisesti uusittujen Tailscale-TLS-sertifikaattien
+#   saumattoman käyttöönoton ilman katkoja.
+# - Pienimmän oikeuden periaate (PoLP): Arkaluontoiset TLS-sertifikaatit ja avaimet 
+#   on liitetty konttiin turvallisesti vain luku (Read-Only, :ro) -tiloissa.
+# - Riippuvuudet: "depends_on" varmistaa, että NGINX reitittää liikennettä vasta, 
+#   kun kriittiset taustapalvelut (SonarQube, GitLab, HashiCorp Vault) ovat ylhäällä.
+#
+# Verifiointi:
+#   Tarkista, että isäntäkone kuuntelee portteja 80/443 vain Tailscale-IP:llä:
+#   sudo ss -tulpn | grep -E ":80|:443"
+#
+
+services:
+  nginx:
+    image: nginx:1.30
+    platform: linux/arm64
+    container_name: nginx_lb
+    depends_on:
+       - sonarqube
+       - gitlab
+       - hvault
+    ports:
+      # Bind only to the tailscale0 virtual network interface
+      - "${TAILSCALE_ADDRESS}:80:80"
+      - "${TAILSCALE_ADDRESS}:443:443"
+    volumes:
+      - /etc/ssl/certs/tailscale.crt:/etc/ssl/certs/tailscale.crt:ro
+      - /etc/ssl/private/tailscale.key:/etc/ssl/private/tailscale.key:ro
+      - ./nginx.conf:/etc/nginx/conf.d/nginx.conf
