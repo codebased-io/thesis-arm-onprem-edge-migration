@@ -1,0 +1,24 @@
+# /var/spool/cron/crontabs/root
+#
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: Automatisoida Codebased Oy:n kehitysinfran (Raspberry Pi 5) 
+#            Tailscale TLS-sertifikaattien elinkaarenhallinta.
+#
+# Huomiot konfiguraatiosta:
+# - Automaatio: Cron-työ ajetaan kerran viikossa (maanantaisin aamulla klo 03:00).
+#   Tailscale uusii sertifikaatin automaattisesti, kun se lähestyy vanhenemistaan.
+# - Luotettavuus (Absoluuttiset polut): Cron-ympäristön rajallisen PATH-muuttujan vuoksi 
+#   komennot (tailscale, docker) on määritetty täydellisillä absoluuttisilla poluilla 
+#   (/usr/bin/...), mikä takaa suorituksen onnistumisen.
+# - Ehdollinen logiikka (&&): NGINX-käänteisvälityspalvelin (Reverse Proxy) ladataan uudelleen (reload) 
+#   vain ja ainoastaan silloin, jos sertifikaatin uusimisprosessi päättyy onnistuneesti 
+#   (exit code 0). Tämä minimoi riskin rikkonaisen tilan lataamisesta NGINX:ään.
+#
+# Verifiointi:
+#   Tarkista cron-loki suorituksen jälkeen: grep CRON /var/log/syslog
+#   Tarkista sertifikaatin voimassaolo: tailscale cert --status
+#
+# HUOM: Tämä on julkiseen opinnäytetyöhön tarkoitettu versio. 
+#       Tailscale-verkko-osoite on osittain sensuroitu.
+0 3 * * 1 /usr/bin/tailscale cert --cert-file /etc/ssl/certs/tailscale.crt --key-file /etc/ssl/private/tailscale.key codebased-edge.[SENSUROITU].ts.net && /usr/bin/docker exec nginx_lb nginx -s reload
