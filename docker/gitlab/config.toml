@@ -23,8 +23,8 @@
 #   sudo gitlab-runner verify
 #   sudo gitlab-runner status
 #
-# HUOM: Tämä versio on tarkoitettu julkiseen opinnäytetyön repositorioon.
-#       Runnerin autentikointitoken on sensuroitu turvallisuussyistä.
+# HUOM: Runnerin autentikointitoken on sensuroitu turvallisuussyistä.
+#
 
 concurrent = 1
 check_interval = 0

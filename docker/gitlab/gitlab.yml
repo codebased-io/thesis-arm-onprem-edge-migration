@@ -1,13 +1,12 @@
-# gitlab.yml
-#
 # Tekijä: Jesse Karnavaara
 # Vuosi: 2026
-# Tarkoitus: GitLab CE -palvelun konfiguraatio, joka sisällytetään varsinaiseen 
-#            docker-compose.yml -tiedostoon 'extends'-ominaisuuden avulla.
-#            Määritetty Codebased Oy:n Raspberry Pi 5 -kehitysinfraan.
+# Tarkoitus: GitLab CE -palvelun ja sen GitLab Runner konfiguraatio,
+#            joka sisällytetään varsinaiseen docker-compose.yml -tiedostoon
+#            "extends"-ominaisuuden avulla. Määritetty Codebased Oy:n
+#.           Raspberry Pi 5 -kehitysinfraan.
 #
 # Huomiot konfiguraatiosta:
-# - Arkkitehtuuri: 'platform: linux/arm64' pakottaa oikean levykuvan Raspberry Pi:lle.
+# - Arkkitehtuuri: "platform: linux/arm64" pakottaa oikean levykuvan Raspberry Pi:lle.
 # - Verkko ja Proxy: GitLabin sisäinen NGINX on konfiguroitu toimimaan ulkoisen 
 #   käänteisen välityspalvelimen (reverse proxy) takana Tailscale-verkossa (*.ts.net).
 # - Identiteetinhallinta: Azure AD (Entra ID) SSO -integraatio OmniAuthin avulla. 
@@ -16,8 +15,12 @@
 # - Valvonta: Kustomoitu Docker Healthcheck, joka osaa ottaa huomioon GitLabin 
 #   verrattain pitkän käynnistymisajan (start_period: 360s) kevyellä ARM-laitteistolla.
 #
-# HUOM: Tämä versio on muokattu julkista opinnäytetyön repositoriota varten.
-#       Osa Tailscale-verkko-osoitteesta on sensuroitu.
+# Verifiointi:
+#   Varmista kontin tila: docker ps | grep gitlab
+#   Lue lokit: docker logs -f gitlab
+#
+# HUOM: Osa Tailscale-verkko-osoitteesta on sensuroitu.
+#
 
 services:
   gitlab:
@@ -57,3 +60,24 @@ services:
       timeout: 15s
       retries: 5
       start_period: 360s
+
+# Huomiot konfiguraatiosta:
+# - Docker-integraatio: Isäntäkoneen Docker-soketti (/var/run/docker.sock) 
+#   on tuotu konttiin, jotta Runner voi hallita isäntäkoneen Docker-taustaprosessia (daemon) 
+#   ja ajaa CI/CD-vaiheita erillisissä konteissa kyljittäin (Docker-out-of-Docker/DooD).
+# - Pysyvyys: Konfiguraatiotiedostot haetaan dynaamisesti Docker Compose configs-ominaisuudella 
+#   (gitlab_runner_config), joten rekisteröintitiedot säilyvät päivityksissä (esim. docker compose down).  
+
+  gitlab_runner:
+    image: gitlab/gitlab-runner:latest
+    platform: linux/arm64
+    container_name: gitlab_runner
+    configs:
+      - source: gitlab_runner_config
+        target: /etc/gitlab-runner/config.toml
+        uid: "999" # gitlab_runner-kontin sisäisen käyttäjän ID
+        gid: "999"
+        mode: 0644
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab_runner_config:/etc/gitlab-runner

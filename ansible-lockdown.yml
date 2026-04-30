@@ -1,5 +1,8 @@
 # Raspberry Pi 5 (Ubuntu Server 24.04 ARM64)
 #
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# 
 # Käytetty rooli: ansible-lockdown/UBUNTU24-CIS (v1.5.0)
 # Tarkoitus: Soveltaa CIS Ubuntu 24.04 Level 1 -standardia
 #           ARM-pohjaiseen reunalaskentaympäristöön
@@ -10,8 +13,6 @@
 # Riskit on hyväksytty pienen kehitystiimin ja
 # kehitysympäristön luonteen vuoksi.
 #
-# Tekijä: Jesse Karnavaara
-# Päivämäärä: 2026
 
 - name: Ota käyttöön CIS-tason 1 palvelinkovennus ARM-pohjaisessa Raspberry Pi 5:ssä
   hosts: raspberry_pis

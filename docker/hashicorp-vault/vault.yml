@@ -1,0 +1,52 @@
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: HashiCorp Vault -salaisuuksienhallintapalvelun konfiguraatio,
+#            joka sisällytetään docker-compose.yml -päärakenteeseen.
+#
+# Huomiot konfiguraatiosta ja tietoturvasta:
+# - Arkkitehtuuri: "platform: linux/arm64" varmistaa oikean levykuvan Raspberry Pi 5:lle.
+# - Muistin lukitus (mlock): "VAULT_DISABLE_MLOCK=true" on asetettu, koska järjestelmä 
+#   on CIS-kovennettu (swap on poistettu isäntäkoneelta). Tämä mahdollistaa sen, 
+#   ettei kontille tarvitse myöntää ylimääräistä "IPC_LOCK" -kyvykkyyttä 
+#   (pienimmän oikeuden periaate).
+# - Core Dumps: "ulimits: core: 0" estää ytimen vedosten (core dumps) kirjoittamisen 
+#   levylle kontin kaatuessa. Tämä on kriittistä, jotta muistissa olevat 
+#   salaisuudet eivät vuoda tiedostojärjestelmään.
+# - Verkkoturvallisuus: Portti 8200 on altistettu (expose) vain Dockerin sisäiselle 
+#   verkolle. TLS-terminoinnin ja julkisen reitityksen hoitaa nginx-kontti.
+# - Valvonta (Healthcheck): Vaultin tilaa valvotaan HTTP-rajapinnan kautta. 
+#   URL-parametreilla (sealedcode=200 jne.) varmistetaan, ettei Docker merkitse 
+#   konttia virheelliseen "unhealthy" -tilaan Vaultin ollessa sinetöitynä.
+# - Konfiguraatio (Docker Configs): Isäntäkoneen hakemistoriippuvuuksista (bind mounts)
+#   on luovuttu. Asetustiedosto (vault.hcl) tuodaan konttiin Docker Config -objektina, 
+#   mikä parantaa siirrettävyyttä ja pakottaa tiedoston tiukasti vain luku (read-only, :ro) -tilaan.
+#
+# HUOM: Tämä on julkiseen opinnäytetyöhön tarkoitettu tiedosto.
+
+services:
+  hvault:
+    image: hashicorp/vault:1.15.6
+    platform: linux/arm64
+    container_name: hvault
+    expose: 
+      - "8200"
+    environment:
+      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_DISABLE_MLOCK: "true"
+    volumes:
+      - vault-volume:/data:rw
+    configs:
+      - source: vault_config
+        target: /vault/config/vault.hcl
+        uid: "100" # vault-kontin sisäisen käyttäjän ID
+        gid: "1000"
+        mode: 0440
+    entrypoint: vault server -config=/vault/config/vault.hcl
+    ulimits: 
+      core: 0
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --spider 'http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s

@@ -1,0 +1,96 @@
+# Tekijä: Jesse Karnavaara
+# Vuosi: 2026
+# Tarkoitus: Pääorkestrointitiedosto Codebased Oy:n kehitysinfralle (Raspberry Pi 5).
+#            Sitoo yhteen erilliset, modulaariset palvelukonfiguraatiot.
+#
+# Huomiot arkkitehtuurista ja turvallisuudesta:
+# - Modulaarisuus (DRY): YAML-ankkurin (x-defaults, &defaults) avulla vältetään 
+#   koodin toistaminen. Se pakottaa kaikille konteille saman uudelleenkäynnistyskäytännön 
+#   (restart: always) ja liittää ne oikeaan tietoturvaverkkoon.
+# - Resurssienhallinta (Lokitus): Koska järjestelmä pyörii SBC-laitteella 
+#   (Raspberry Pi), isäntäkoneen levytila ja NVMe:n kuluminen on huomioitu. 
+#   Lokien koko on rajoitettu max 50 MB per kontti (5 tiedostoa x 10m).
+# - Verkkoturvallisuus (Micro-segmentation): Oletusverkon (default bridge) sijaan 
+#   käytetään täysin kustomoitua verkkoa ("custom"), jonka aliverkko (172.16.0.0/27) 
+#   on rajoitettu vain 29 IP-osoitteeseen. Tämä minimoi lateral movement -riskin 
+#   mahdollisessa murrossa.
+# - Konfiguraatioiden lukitseminen: Asetustiedostot (Vault, NGINX, Runner) syötetään 
+#   kontteihin Docker Configs -ominaisuudella turvallisten bind mountien sijaan.
+#
+# HUOM: Docker Compose lukee ympäristömuuttujat piilotetusta .env -tiedostosta automaattisesti.
+
+x-defaults:
+  &defaults
+  restart: always
+  logging:
+    options:
+      max-size: "10m"
+      max-file: "5"
+    driver: json-file
+  networks:
+    - custom
+
+configs:
+  vault_config:
+    file: ./hashicorp-vault/vault.hcl
+  nginx_config:
+    file: ./nginx/nginx.conf
+  gitlab_runner_config: 
+    file: ./gitlab/config.toml
+
+networks:
+  custom:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.0.0/27 # Rajoitettu aliverkko (max 29 käytettävää IP-osoitetta)
+
+services:
+  gitlab:
+    <<: *defaults
+    extends:
+      file: ./gitlab/gitlab.yml
+      service: gitlab
+
+  gitlab_runner:
+    <<: *defaults
+    extends:
+      file: ./gitlab/gitlab.yml
+      service: gitlab_runner
+
+  sonarqube:
+    <<: *defaults
+    extends:
+      file: ./sonarqube/sonarqube.yml
+      service: sonarqube
+
+  db:
+    <<: *defaults
+    extends:
+      file: ./sonarqube/sonarqube.yml
+      service: db
+
+  nginx:
+    <<: *defaults
+    extends:
+      file: ./nginx/nginx.yml
+      service: nginx
+
+  hvault:
+    <<: *defaults
+    extends:
+      file: ./hashicorp-vault/vault.yml
+      service: hvault
+
+volumes:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  postgresql_v16:
+  postgresql_v16_data:
+  gitlab_runner_config:
+  vault-volume:

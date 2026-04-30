@@ -19,6 +19,6 @@
 #   Tarkista cron-loki suorituksen jälkeen: grep CRON /var/log/syslog
 #   Tarkista sertifikaatin voimassaolo: tailscale cert --status
 #
-# HUOM: Tämä on julkiseen opinnäytetyöhön tarkoitettu versio. 
-#       Tailscale-verkko-osoite on osittain sensuroitu.
+# HUOM: Tailscale-verkko-osoite on osittain sensuroitu.
+#
 0 3 * * 1 /usr/bin/tailscale cert --cert-file /etc/ssl/certs/tailscale.crt --key-file /etc/ssl/private/tailscale.key codebased-edge.[SENSUROITU].ts.net && /usr/bin/docker exec nginx_lb nginx -s reload

@@ -1,5 +1,3 @@
-# nginx.yml
-#
 # Tekijä: Jesse Karnavaara
 # Vuosi: 2026
 # Tarkoitus: NGINX-käänteisvälityspalvelimen (Reverse Proxy) konfiguraatio, 
@@ -34,11 +32,16 @@ services:
        - sonarqube
        - gitlab
        - hvault
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/conf.d/nginx.conf
+        uid: "101" # nginx-kontin sisäisen käyttäjän ID
+        gid: "101"
+        mode: 0640
     ports:
-      # Bind only to the tailscale0 virtual network interface
+      # Kuuntele ja lähetä liikennettä virutaaliselle tailscale0-verkkokortille
       - "${TAILSCALE_ADDRESS}:80:80"
       - "${TAILSCALE_ADDRESS}:443:443"
     volumes:
       - /etc/ssl/certs/tailscale.crt:/etc/ssl/certs/tailscale.crt:ro
       - /etc/ssl/private/tailscale.key:/etc/ssl/private/tailscale.key:ro
-      - ./nginx.conf:/etc/nginx/conf.d/nginx.conf
